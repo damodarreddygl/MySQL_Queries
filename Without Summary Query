@@ -1,0 +1,39 @@
+select tmp3.host_name,
+tmp3.total as total,
+tmp3.down as total_down,
+tmp3.sc_down as sc_down,
+tmp3.total-(tmp3.down-tmp3.sc_down) as up
+from (
+select tmp2.host_name as host_name,
+24.0 as total,
+ROUND(sum(tmp2.timedif))  as total,
+ROUND(TIMESTAMPDIFF(SECOND, $P{start_date} , $P{end_date} ) / 3600, 1) as total,
+round(sum(if(tmp2.current_state=0,(tmp2.timedif),0))/3600,1) as up,
+round(sum(if(tmp2.current_state = 1,(tmp2.timedif),0))/3600,1) as down,
+round(sum(if(tmp2.current_state in (1,2) and tmp2.scheduled_downtime_depth=1,(tmp2.timedif),0))/3600,1) as sc_down
+from (
+select tmp.host_name as host_name, if(tmp.plt1=0 or tmp.plt1 >tmp.plt,tmp.plt,tmp.plt1) as min_lt,tmp.lt as max_lt, 
+(timestampdiff(second,if(tmp.plt1=0 or tmp.plt1 >tmp.plt,tmp.plt,tmp.plt1),tmp.lt)) as timedif, tmp.state as current_state,tmp.scheduled_downtime_depth 
+from(
+select tmp1.host_name as host_name,tmp1.current_state as state,tmp1.scheduled_downtime_depth as scheduled_downtime_depth,@prev := "",@first11:="",@first21:="",@first31:="",
+if(current_state =0,if(@first11="",@first11:=from_unixtime((tmp1.last_check)),@tmp11:=""),@first11:="" ) as t,
+if(current_state >= 1,if(@first21="",@first21:=from_unixtime((tmp1.last_check)),@tmp21:=""),@first21:="" ) as t1,
+if(current_state =2,if(@first31="",@first31:=from_unixtime((tmp1.last_check)),@tmp31:=""),@first31:="" ) as t2,
+if(tmp1.scheduled_downtime_depth =0,if(@first41="",@first41:=from_unixtime((last_check)),@tmp41:=""),@first41:="" ) as t3,
+if(tmp1.scheduled_downtime_depth =1,if(@first51="",@first51:=from_unixtime((last_check)),@tmp51:=""),@first51:="" ) as t4,
+if(tmp1.scheduled_downtime_depth =2,if(@first61="",@first61:=from_unixtime((last_check)),@tmp61:=""),@first61:="" ) as t5,
+if(tmp1.scheduled_downtime_depth =5,if(@first71="",@first71:=from_unixtime((last_check)),@tmp71:=""),@first71:="" ) as t6,
+@prev as plt1,@prev:=from_unixtime(tmp1.last_check) AS plt,from_unixtime(max(tmp1.last_check)) AS lt,@first11,@first21,@first31,@first41,@first51,@first61,@first71
+from(
+select host_name,current_state,last_check,scheduled_downtime_depth
+from hosts force index (cmp_index)
+where $X{IN,host_name,hosts} and last_check BETWEEN UNIX_TIMESTAMP(DATE_FORMAT(CURDATE() - INTERVAL 1 DAY, '%Y-%m-%d 00:00:00'))
+AND UNIX_TIMESTAMP(DATE_FORMAT(CURDATE() - INTERVAL 1 DAY, '%Y-%m-%d 23:59:59'))
+group by host_name,last_check 
+order by host_name
+) as tmp1
+group by @first11,@first21,@first31,@first41,@first51,@first61,@first71,plt,host_name
+order by host_name
+)as tmp where tmp.state is not null
+) as tmp2 group by host_name order by null
+) as tmp3
