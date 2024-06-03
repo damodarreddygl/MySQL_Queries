@@ -1,0 +1,2 @@
+# MySQL_Queries
+MySQL QUERIES
