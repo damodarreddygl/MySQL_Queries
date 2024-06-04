@@ -27,8 +27,20 @@ if(tmp1.scheduled_downtime_depth =5,if(@first71="",@first71:=from_unixtime((last
 from(
 select host_name,current_state,last_check,scheduled_downtime_depth
 from hosts force index (cmp_index)
-where $X{IN,host_name,hosts} and last_check BETWEEN UNIX_TIMESTAMP(DATE_FORMAT(CURDATE() - INTERVAL 1 DAY, '%Y-%m-%d 00:00:00'))
+
+WHERE $X{IN,host_name,hosts} 
+AND last_check BETWEEN UNIX_TIMESTAMP(DATE_FORMAT(CURDATE() - INTERVAL 1 DAY, '%Y-%m-%d 00:00:00'))
 AND UNIX_TIMESTAMP(DATE_FORMAT(CURDATE() - INTERVAL 1 DAY, '%Y-%m-%d 23:59:59'))
+
+WHERE host_name IN ('S08_PIDS_TFT_Displays_04')
+AND last_update BETWEEN UNIX_TIMESTAMP('2024-03-17 00:00:00') and UNIX_TIMESTAMP('2024-03-17 23:59:59')
+
+WHERE $X{IN,host_name,hosts} 
+AND last_update BETWEEN UNIX_TIMESTAMP(DATE_FORMAT(CURDATE(), '%Y-%m-%d 00:00:00')) AND UNIX_TIMESTAMP(NOW())
+
+WHERE $X{IN,host_name,hosts} 
+AND last_check BETWEEN UNIX_TIMESTAMP($P{start_date}) and UNIX_TIMESTAMP($P{end_date})
+
 group by host_name,last_check 
 order by host_name
 ) as tmp1
